@@ -12,7 +12,68 @@ interface NotificationRequest {
   campaignName: string;
 }
 
-const handler = async (req: Request): Promise<Response> => {
+interface SendEmailParams {
+  apiKey: string;
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}
+
+interface SendEmailResult {
+  success: boolean;
+  status: number;
+  message?: string;
+  body?: string;
+}
+
+export const RESEND_API_URL = "https://api.resend.com/emails";
+
+export const sendNotificationEmail = async (
+  params: SendEmailParams,
+): Promise<SendEmailResult> => {
+  try {
+    const response = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey}`,
+      },
+      body: JSON.stringify({
+        from: params.from,
+        to: [params.to],
+        subject: params.subject,
+        html: params.html,
+      }),
+    });
+
+    const responseBody = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        status: response.status,
+        message: "Failed to send email via Resend",
+        body: responseBody,
+      };
+    }
+
+    return { success: true, status: response.status, body: responseBody };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown error while sending email";
+
+    return {
+      success: false,
+      status: 500,
+      message,
+    };
+  }
+};
+
+export const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -63,33 +124,62 @@ const handler = async (req: Request): Promise<Response> => {
 
     emailContent += `</ul>`;
 
-    // Here you would normally send the email using Resend
-    // Since the API key might not be set yet, we'll just log it
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    
-    if (resendApiKey) {
-      // TODO: Implement Resend email sending when API key is available
-      console.log("Would send email with content:", emailContent);
-    } else {
-      console.log("RESEND_API_KEY not set, skipping email send");
-      console.log("Email content would be:", emailContent);
+
+    if (!resendApiKey) {
+      const errorMessage = "RESEND_API_KEY not set, cannot send notification email";
+      console.error(errorMessage);
+      return new Response(
+        JSON.stringify({ error: errorMessage }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
 
-    // Update notification as sent
+    const resendFromEmail =
+      Deno.env.get("RESEND_FROM_EMAIL") ?? "notifications@example.com";
+
+    const sendResult = await sendNotificationEmail({
+      apiKey: resendApiKey,
+      from: resendFromEmail,
+      to: email,
+      subject: `Assignment Completed: ${campaignName}`,
+      html: emailContent,
+    });
+
+    if (!sendResult.success) {
+      console.error("Failed to send email via Resend", sendResult);
+      return new Response(
+        JSON.stringify({
+          error: sendResult.message ?? "Failed to send notification email",
+          details: sendResult.body,
+        }),
+        {
+          status: sendResult.status,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
+    }
+
     await supabase
       .from("notifications")
       .update({ sent: true })
       .eq("assignment_id", assignmentId);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Notification processed" }),
+      JSON.stringify({
+        success: true,
+        message: "Notification processed",
+      }),
       {
         status: 200,
         headers: {
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
+      },
     );
   } catch (error: any) {
     console.error("Error in send-notification function:", error);
@@ -103,4 +193,6 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-serve(handler);
+if (import.meta.main) {
+  serve(handler);
+}
