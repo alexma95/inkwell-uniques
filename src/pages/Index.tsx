@@ -13,11 +13,16 @@ const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const OUT_OF_TEXTS_ERROR = "OUT_OF_TEXTS";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
     setIsLoading(true);
+    let assignmentId: string | null = null;
+    const assignedTextIds: string[] = [];
+
     try {
       // Get active campaign (for now, just the first one)
       const { data: campaigns, error: campaignError } = await supabase
@@ -58,6 +63,8 @@ const Index = () => {
 
       if (assignmentError) throw assignmentError;
 
+      assignmentId = newAssignment.id;
+
       // Get all products for this campaign
       const { data: products, error: productsError } = await supabase
         .from("products")
@@ -78,31 +85,67 @@ const Index = () => {
 
         if (textsError) throw textsError;
 
-        if (availableTexts && availableTexts.length > 0) {
-          // Pick a random text
-          const randomText = availableTexts[Math.floor(Math.random() * availableTexts.length)];
-
-          // Mark text as assigned
-          await supabase
-            .from("texts")
-            .update({ is_assigned: true })
-            .eq("id", randomText.id);
-
-          // Create assignment_text record
-          await supabase
-            .from("assignment_texts")
-            .insert({
-              assignment_id: newAssignment.id,
-              product_id: product.id,
-              text_id: randomText.id,
-            });
+        if (!availableTexts || availableTexts.length === 0) {
+          const error = new Error(OUT_OF_TEXTS_ERROR);
+          (error as Error & { productId?: string }).productId = product.id;
+          throw error;
         }
+
+        // Pick a random text
+        const randomText = availableTexts[Math.floor(Math.random() * availableTexts.length)];
+
+        // Mark text as assigned
+        const { error: updateTextError } = await supabase
+          .from("texts")
+          .update({ is_assigned: true })
+          .eq("id", randomText.id);
+
+        if (updateTextError) throw updateTextError;
+
+        assignedTextIds.push(randomText.id);
+
+        // Create assignment_text record
+        const { error: assignmentTextError } = await supabase
+          .from("assignment_texts")
+          .insert({
+            assignment_id: newAssignment.id,
+            product_id: product.id,
+            text_id: randomText.id,
+          });
+
+        if (assignmentTextError) throw assignmentTextError;
       }
 
       // Navigate to assignment page
       navigate(`/assignment/${newAssignment.id}`);
     } catch (error: any) {
       console.error("Error creating assignment:", error);
+
+      // Attempt to roll back any partial assignment that may have been created
+      try {
+        if (assignmentId) {
+          await supabase.from("assignment_texts").delete().eq("assignment_id", assignmentId);
+          if (assignedTextIds.length > 0) {
+            await supabase
+              .from("texts")
+              .update({ is_assigned: false })
+              .in("id", assignedTextIds);
+          }
+          await supabase.from("user_assignments").delete().eq("id", assignmentId);
+        }
+      } catch (rollbackError) {
+        console.error("Error rolling back assignment:", rollbackError);
+      }
+
+      if (error?.message === OUT_OF_TEXTS_ERROR) {
+        toast({
+          title: "Campaign out of texts",
+          description: "All available texts for this campaign have already been assigned. Please check back later.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Error",
         description: error.message || "Failed to create assignment",
