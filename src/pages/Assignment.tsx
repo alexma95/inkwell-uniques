@@ -145,8 +145,8 @@ const Assignment = () => {
       await supabase.functions.invoke("send-notification", {
         body: {
           assignmentId: assignment.id,
-          email: assignment.email,
           campaignName: assignment.campaigns?.name,
+          userEmail: assignment.email,
         },
       });
 

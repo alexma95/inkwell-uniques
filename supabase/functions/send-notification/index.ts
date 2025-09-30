@@ -8,8 +8,8 @@ const corsHeaders = {
 
 interface NotificationRequest {
   assignmentId: string;
-  email: string;
   campaignName: string;
+  userEmail?: string;
 }
 
 interface SendEmailParams {
@@ -84,9 +84,13 @@ export const handler = async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { assignmentId, email, campaignName }: NotificationRequest = await req.json();
+    const { assignmentId, campaignName, userEmail }: NotificationRequest =
+      await req.json();
 
     console.log("Processing notification for assignment:", assignmentId);
+    if (userEmail) {
+      console.log("Assignment completed by:", userEmail);
+    }
 
     // Get assignment details with texts
     const { data: assignmentTexts, error: textsError } = await supabase
@@ -106,7 +110,7 @@ export const handler = async (req: Request): Promise<Response> => {
     // Format the email content
     let emailContent = `
       <h2>Assignment Completed</h2>
-      <p><strong>User Email:</strong> ${email}</p>
+      <p><strong>User Email:</strong> ${userEmail ?? "Not provided"}</p>
       <p><strong>Campaign:</strong> ${campaignName}</p>
       <h3>Assigned Texts:</h3>
       <ul>
@@ -141,10 +145,15 @@ export const handler = async (req: Request): Promise<Response> => {
     const resendFromEmail =
       Deno.env.get("RESEND_FROM_EMAIL") ?? "notifications@example.com";
 
+    const resendToEmail =
+      Deno.env.get("RESEND_TO_EMAIL") ?? resendFromEmail;
+
+    console.log("Sending notification email to:", resendToEmail);
+
     const sendResult = await sendNotificationEmail({
       apiKey: resendApiKey,
       from: resendFromEmail,
-      to: email,
+      to: resendToEmail,
       subject: `Assignment Completed: ${campaignName}`,
       html: emailContent,
     });

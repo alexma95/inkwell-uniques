@@ -71,3 +71,11 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Supabase edge function configuration
+
+When deploying the `send-notification` edge function, ensure the following environment variables are configured:
+
+- `RESEND_API_KEY`: API key used to authenticate with Resend.
+- `RESEND_FROM_EMAIL`: Address used for the `from` field in Resend requests.
+- `RESEND_TO_EMAIL`: (New) Recipient for notification emails. Defaults to the `RESEND_FROM_EMAIL` value if not explicitly provided, so set this to the speaker's email address to receive assignment completion notifications.
