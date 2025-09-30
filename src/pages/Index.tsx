@@ -67,36 +67,35 @@ const Index = () => {
 
       if (productsError) throw productsError;
 
-      // Assign random texts for each product
+      // Assign texts for each product using atomic claim RPC
       for (const product of products) {
-        // Get available texts for this product
-        const { data: availableTexts, error: textsError } = await supabase
-          .from("texts")
-          .select("*")
-          .eq("product_id", product.id)
-          .eq("is_assigned", false);
+        const { data: claimedText, error: claimError } = await supabase.rpc(
+          "claim_text",
+          {
+            p_product_id: product.id,
+          },
+        );
 
-        if (textsError) throw textsError;
+        if (claimError) {
+          if (claimError.code === "P0001" || claimError.message === "NO_TEXTS_AVAILABLE") {
+            throw new Error("No texts available for this product right now. Please try again later.");
+          }
 
-        if (availableTexts && availableTexts.length > 0) {
-          // Pick a random text
-          const randomText = availableTexts[Math.floor(Math.random() * availableTexts.length)];
-
-          // Mark text as assigned
-          await supabase
-            .from("texts")
-            .update({ is_assigned: true })
-            .eq("id", randomText.id);
-
-          // Create assignment_text record
-          await supabase
-            .from("assignment_texts")
-            .insert({
-              assignment_id: newAssignment.id,
-              product_id: product.id,
-              text_id: randomText.id,
-            });
+          throw claimError;
         }
+
+        if (!claimedText) {
+          throw new Error("Failed to claim a text for this product.");
+        }
+
+        // Create assignment_text record
+        await supabase
+          .from("assignment_texts")
+          .insert({
+            assignment_id: newAssignment.id,
+            product_id: product.id,
+            text_id: claimedText.id,
+          });
       }
 
       // Navigate to assignment page
