@@ -5,7 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+
+type TextRow = Database["public"]["Tables"]["texts"]["Row"];
 
 const Index = () => {
   const [email, setEmail] = useState("");
@@ -74,35 +77,30 @@ const Index = () => {
 
       if (productsError) throw productsError;
 
-      // Assign random texts for each product
+      // Assign texts for each product using atomic claim RPC
       for (const product of products) {
-        // Get available texts for this product
-        const { data: availableTexts, error: textsError } = await supabase
-          .from("texts")
-          .select("*")
-          .eq("product_id", product.id)
-          .eq("is_assigned", false);
+        const { data: claimedText, error: claimError } = await supabase
+          .rpc<TextRow>("claim_text", {
+            assignment_id: newAssignment.id,
+            product_id: product.id,
+          })
+          .single();
 
-        if (textsError) throw textsError;
+        if (claimError) {
+          if (claimError.message === "NO_TEXTS_AVAILABLE") {
+            const error = new Error(OUT_OF_TEXTS_ERROR) as Error & { productId?: string };
+            error.productId = product.id;
+            throw error;
+          }
 
-        if (!availableTexts || availableTexts.length === 0) {
-          const error = new Error(OUT_OF_TEXTS_ERROR);
-          (error as Error & { productId?: string }).productId = product.id;
-          throw error;
+          throw claimError;
         }
 
-        // Pick a random text
-        const randomText = availableTexts[Math.floor(Math.random() * availableTexts.length)];
+        if (!claimedText) {
+          throw new Error("Failed to claim text");
+        }
 
-        // Mark text as assigned
-        const { error: updateTextError } = await supabase
-          .from("texts")
-          .update({ is_assigned: true })
-          .eq("id", randomText.id);
-
-        if (updateTextError) throw updateTextError;
-
-        assignedTextIds.push(randomText.id);
+        assignedTextIds.push(claimedText.id);
 
         // Create assignment_text record
         const { error: assignmentTextError } = await supabase
@@ -110,7 +108,7 @@ const Index = () => {
           .insert({
             assignment_id: newAssignment.id,
             product_id: product.id,
-            text_id: randomText.id,
+            text_id: claimedText.id,
           });
 
         if (assignmentTextError) throw assignmentTextError;
@@ -118,7 +116,7 @@ const Index = () => {
 
       // Navigate to assignment page
       navigate(`/assignment/${newAssignment.id}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating assignment:", error);
 
       // Attempt to roll back any partial assignment that may have been created
@@ -137,7 +135,7 @@ const Index = () => {
         console.error("Error rolling back assignment:", rollbackError);
       }
 
-      if (error?.message === OUT_OF_TEXTS_ERROR) {
+      if (error instanceof Error && error.message === OUT_OF_TEXTS_ERROR) {
         toast({
           title: "Campaign out of texts",
           description: "All available texts for this campaign have already been assigned. Please check back later.",
@@ -148,7 +146,10 @@ const Index = () => {
 
       toast({
         title: "Error",
-        description: error.message || "Failed to create assignment",
+        description:
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to create assignment",
         variant: "destructive",
       });
     } finally {
