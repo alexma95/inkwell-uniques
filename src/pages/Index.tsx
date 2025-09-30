@@ -5,7 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+
+type TextRow = Database["public"]["Tables"]["texts"]["Row"];
 
 const Index = () => {
   const [email, setEmail] = useState("");
@@ -69,7 +72,7 @@ const Index = () => {
 
       // Assign texts for each product using atomic claim RPC
       for (const product of products) {
-        const { data: claimedText, error: claimError } = await supabase.rpc(
+        const { data: claimedText, error: claimError } = await supabase.rpc<TextRow>(
           "claim_text",
           {
             p_product_id: product.id,
@@ -100,11 +103,12 @@ const Index = () => {
 
       // Navigate to assignment page
       navigate(`/assignment/${newAssignment.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating assignment:", error);
+      const message = error instanceof Error ? error.message : "Failed to create assignment";
       toast({
         title: "Error",
-        description: error.message || "Failed to create assignment",
+        description: message,
         variant: "destructive",
       });
     } finally {
