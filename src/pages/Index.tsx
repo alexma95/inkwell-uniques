@@ -117,6 +117,7 @@ const Index = () => {
       navigate(`/assignment/${newAssignment.id}`);
     } catch (error) {
       console.error("Error creating assignment:", error);
+      console.error("Full error details:", JSON.stringify(error, null, 2));
 
       // Attempt to roll back any partial assignment that may have been created
       try {
