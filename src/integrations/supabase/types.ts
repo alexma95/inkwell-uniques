@@ -226,7 +226,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_text: {
+        Args: { assignment_id: string; product_id: string }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          is_assigned: boolean
+          option_number: number
+          product_id: string
+        }
+      }
     }
     Enums: {
       assignment_status: "assigned" | "viewed" | "completed"
