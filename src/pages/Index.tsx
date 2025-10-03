@@ -79,12 +79,11 @@ const Index = () => {
 
       // Assign texts for each product using atomic claim RPC
       for (const product of products) {
-        const { data: claimedText, error: claimError } = await supabase
-          .rpc<TextRow>("claim_text", {
+        const { data: claimedText, error: claimError } = await (supabase as any)
+          .rpc("claim_text", {
             assignment_id: newAssignment.id,
             product_id: product.id,
-          })
-          .single();
+          });
 
         if (claimError) {
           if (claimError.message === "NO_TEXTS_AVAILABLE") {
@@ -100,7 +99,7 @@ const Index = () => {
           throw new Error("Failed to claim text");
         }
 
-        assignedTextIds.push(claimedText.id);
+        assignedTextIds.push((claimedText as TextRow).id);
 
         // Create assignment_text record
         const { error: assignmentTextError } = await supabase
@@ -108,7 +107,7 @@ const Index = () => {
           .insert({
             assignment_id: newAssignment.id,
             product_id: product.id,
-            text_id: claimedText.id,
+            text_id: (claimedText as TextRow).id,
           });
 
         if (assignmentTextError) throw assignmentTextError;

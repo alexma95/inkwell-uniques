@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      assignment_screenshots: {
-        Row: {
-          assignment_id: string
-          drive_file_id: string | null
-          drive_view_url: string | null
-          file_name: string
-          id: string
-          notes: string | null
-          product_id: string | null
-          uploaded_at: string
-        }
-        Insert: {
-          assignment_id: string
-          drive_file_id?: string | null
-          drive_view_url?: string | null
-          file_name: string
-          id?: string
-          notes?: string | null
-          product_id?: string | null
-          uploaded_at?: string
-        }
-        Update: {
-          assignment_id?: string
-          drive_file_id?: string | null
-          drive_view_url?: string | null
-          file_name?: string
-          id?: string
-          notes?: string | null
-          product_id?: string | null
-          uploaded_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "assignment_screenshots_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "user_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "assignment_screenshots_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       assignment_texts: {
         Row: {
           assignment_id: string
