@@ -81,8 +81,8 @@ const Index = () => {
       for (const product of products) {
         const { data: claimedText, error: claimError } = await (supabase as any)
           .rpc("claim_text", {
-            assignment_id: newAssignment.id,
-            product_id: product.id,
+            p_assignment_id: newAssignment.id,
+            p_product_id: product.id,
           });
 
         if (claimError) {

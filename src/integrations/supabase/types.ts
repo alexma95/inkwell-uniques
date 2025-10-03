@@ -227,7 +227,7 @@ export type Database = {
     }
     Functions: {
       claim_text: {
-        Args: { assignment_id: string; product_id: string }
+        Args: { p_assignment_id: string; p_product_id: string }
         Returns: {
           content: string
           created_at: string
