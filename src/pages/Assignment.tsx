@@ -130,17 +130,48 @@ const Assignment = () => {
     }
   };
 
-  const handleUploadUrlChange = async (textId: string, url: string) => {
-    setUploadUrls(prev => ({ ...prev, [textId]: url }));
-    
-    // Save to database
+  const handleFileUpload = async (textId: string, file: File) => {
     try {
-      await supabase
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${textId}-${Date.now()}.${fileExt}`;
+      const filePath = `${assignment.id}/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('assignment-uploads')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('assignment-uploads')
+        .getPublicUrl(filePath);
+
+      const publicUrl = data.publicUrl;
+
+      // Save to database - using any type to bypass type checking temporarily
+      await (supabase as any)
         .from("assignment_texts")
-        .update({ upload_url: url })
+        .update({ upload_url: publicUrl })
         .eq("id", textId);
-    } catch (error) {
-      console.error("Error saving upload URL:", error);
+
+      setUploadUrls(prev => ({ ...prev, [textId]: publicUrl }));
+
+      toast({
+        title: "Upload successful!",
+        description: "Image uploaded successfully",
+      });
+    } catch (error: any) {
+      console.error("Error uploading file:", error);
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -266,12 +297,13 @@ const Assignment = () => {
               {text.product.link && (
                 <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                   <div className="flex items-center gap-2 text-sm">
-                    <LinkIcon className="h-4 w-4" />
+                    <LinkIcon className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-medium mr-2">Product Link:</span>
                     <a 
                       href={text.product.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-blue-600 dark:text-blue-400 hover:underline break-all"
                     >
                       {text.product.link}
                     </a>
@@ -282,13 +314,41 @@ const Assignment = () => {
               <div className="space-y-2 mb-3">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Upload className="h-4 w-4" />
-                  Upload (Google Drive Link - Optional)
+                  Upload Image (Optional)
                 </label>
-                <Input
-                  placeholder="Paste Google Drive link here"
-                  value={uploadUrls[text.id] || ""}
-                  onChange={(e) => handleUploadUrlChange(text.id, e.target.value)}
-                />
+                {uploadUrls[text.id] ? (
+                  <div className="space-y-2">
+                    <img 
+                      src={uploadUrls[text.id]} 
+                      alt="Uploaded" 
+                      className="w-full max-w-xs rounded-lg border"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setUploadUrls(prev => {
+                          const newUrls = { ...prev };
+                          delete newUrls[text.id];
+                          return newUrls;
+                        });
+                      }}
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileUpload(text.id, file);
+                      }
+                    }}
+                  />
+                )}
               </div>
               
               <Button

@@ -13,7 +13,9 @@ const Admin = () => {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [responses, setResponses] = useState<any[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Form states
@@ -69,6 +71,36 @@ const Admin = () => {
       fetchProducts(selectedCampaign);
     }
   }, [selectedCampaign]);
+
+  useEffect(() => {
+    if (selectedAssignment) {
+      fetchResponses(selectedAssignment);
+    }
+  }, [selectedAssignment]);
+
+  const fetchResponses = async (assignmentId: string) => {
+    try {
+      const { data } = await supabase
+        .from("assignment_texts")
+        .select(`
+          *,
+          products(name, position, link),
+          texts(content, option_number)
+        `)
+        .eq("assignment_id", assignmentId)
+        .order("products(position)");
+      
+      const transformedData = data?.map((item: any) => ({
+        ...item,
+        product: item.products,
+        text: item.texts
+      })) || [];
+      
+      setResponses(transformedData);
+    } catch (error) {
+      console.error("Error fetching responses:", error);
+    }
+  };
 
   const createCampaign = async () => {
     if (!newCampaignName.trim()) return;
@@ -183,6 +215,10 @@ const Admin = () => {
             <TabsTrigger value="assignments">
               <Users className="h-4 w-4 mr-2" />
               Assignments
+            </TabsTrigger>
+            <TabsTrigger value="responses">
+              <FileText className="h-4 w-4 mr-2" />
+              Responses
             </TabsTrigger>
           </TabsList>
 
@@ -306,7 +342,15 @@ const Admin = () => {
               <h2 className="text-xl font-semibold mb-4">User Assignments</h2>
               <div className="space-y-2">
                 {assignments.map((assignment) => (
-                  <div key={assignment.id} className="p-3 rounded-lg border">
+                  <div 
+                    key={assignment.id} 
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedAssignment === assignment.id
+                        ? "bg-primary/10 border-primary"
+                        : "hover:bg-muted"
+                    }`}
+                    onClick={() => setSelectedAssignment(assignment.id)}
+                  >
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-medium">{assignment.email}</div>
@@ -332,6 +376,56 @@ const Admin = () => {
                 )}
               </div>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="responses" className="space-y-4">
+            {selectedAssignment ? (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">User Responses</h2>
+                <div className="space-y-4">
+                  {responses.map((response) => (
+                    <div key={response.id} className="p-4 rounded-lg border">
+                      <div className="font-medium mb-2">
+                        {response.product.name} (Position {response.product.position})
+                      </div>
+                      {response.product.link && (
+                        <div className="text-sm text-blue-600 mb-2">
+                          Link: {response.product.link}
+                        </div>
+                      )}
+                      <div className="bg-muted/50 rounded p-3 mb-3">
+                        <div className="text-sm font-medium mb-1">
+                          Selected Text (Option #{response.text.option_number}):
+                        </div>
+                        <div className="text-sm">{response.text.content}</div>
+                      </div>
+                      {response.upload_url && (
+                        <div>
+                          <div className="text-sm font-medium mb-2">Uploaded Image:</div>
+                          <img 
+                            src={response.upload_url} 
+                            alt="User upload"
+                            className="max-w-md rounded-lg border"
+                          />
+                        </div>
+                      )}
+                      {response.copied_at && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Copied at: {new Date(response.copied_at).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {responses.length === 0 && (
+                    <p className="text-muted-foreground">No responses yet</p>
+                  )}
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <p className="text-muted-foreground">Select an assignment to view responses</p>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

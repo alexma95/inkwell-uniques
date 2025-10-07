@@ -21,6 +21,7 @@ export type Database = {
           id: string
           product_id: string
           text_id: string
+          upload_url: string | null
         }
         Insert: {
           assignment_id: string
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           product_id: string
           text_id: string
+          upload_url?: string | null
         }
         Update: {
           assignment_id?: string
@@ -35,6 +37,7 @@ export type Database = {
           id?: string
           product_id?: string
           text_id?: string
+          upload_url?: string | null
         }
         Relationships: [
           {
