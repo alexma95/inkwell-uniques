@@ -64,6 +64,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          instructions: string | null
           name: string
           status: Database["public"]["Enums"]["campaign_status"]
           updated_at: string
@@ -71,6 +72,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          instructions?: string | null
           name: string
           status?: Database["public"]["Enums"]["campaign_status"]
           updated_at?: string
@@ -78,6 +80,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          instructions?: string | null
           name?: string
           status?: Database["public"]["Enums"]["campaign_status"]
           updated_at?: string
@@ -124,6 +127,7 @@ export type Database = {
           campaign_id: string
           created_at: string
           id: string
+          link: string | null
           name: string
           position: number
         }
@@ -131,6 +135,7 @@ export type Database = {
           campaign_id: string
           created_at?: string
           id?: string
+          link?: string | null
           name: string
           position: number
         }
@@ -138,6 +143,7 @@ export type Database = {
           campaign_id?: string
           created_at?: string
           id?: string
+          link?: string | null
           name?: string
           position?: number
         }

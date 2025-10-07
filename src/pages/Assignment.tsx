@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CheckCircle, Copy, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCircle, Copy, ChevronRight, Upload, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -11,9 +12,11 @@ interface AssignmentText {
   product_id: string;
   text_id: string;
   copied_at: string | null;
+  upload_url: string | null;
   product: {
     name: string;
     position: number;
+    link: string | null;
   };
   text: {
     content: string;
@@ -28,6 +31,7 @@ const Assignment = () => {
   const [assignment, setAssignment] = useState<any>(null);
   const [assignmentTexts, setAssignmentTexts] = useState<AssignmentText[]>([]);
   const [copiedTexts, setCopiedTexts] = useState<Set<string>>(new Set());
+  const [uploadUrls, setUploadUrls] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
 
@@ -42,7 +46,7 @@ const Assignment = () => {
       // Fetch assignment details
       const { data: assignmentData, error: assignmentError } = await supabase
         .from("user_assignments")
-        .select("*, campaigns(name)")
+        .select("*, campaigns(name, instructions)")
         .eq("id", id)
         .single();
 
@@ -54,7 +58,7 @@ const Assignment = () => {
         .from("assignment_texts")
         .select(`
           *,
-          products(name, position),
+          products(name, position, link),
           texts(content, option_number)
         `)
         .eq("assignment_id", id)
@@ -68,6 +72,7 @@ const Assignment = () => {
         product_id: item.product_id,
         text_id: item.text_id,
         copied_at: item.copied_at,
+        upload_url: item.upload_url,
         product: item.products,
         text: item.texts
       }));
@@ -81,6 +86,13 @@ const Assignment = () => {
           .map((t: AssignmentText) => t.id)
       );
       setCopiedTexts(copied);
+      
+      // Load existing upload URLs
+      const uploads = transformedTexts.reduce((acc: Record<string, string>, t: AssignmentText) => {
+        if (t.upload_url) acc[t.id] = t.upload_url;
+        return acc;
+      }, {});
+      setUploadUrls(uploads);
     } catch (error: any) {
       console.error("Error fetching assignment:", error);
       toast({
@@ -115,6 +127,20 @@ const Assignment = () => {
         description: "Failed to copy text",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleUploadUrlChange = async (textId: string, url: string) => {
+    setUploadUrls(prev => ({ ...prev, [textId]: url }));
+    
+    // Save to database
+    try {
+      await supabase
+        .from("assignment_texts")
+        .update({ upload_url: url })
+        .eq("id", textId);
+    } catch (error) {
+      console.error("Error saving upload URL:", error);
     }
   };
 
@@ -203,6 +229,12 @@ const Assignment = () => {
           <p className="text-muted-foreground">
             Campaign: {assignment.campaigns?.name} • Email: {assignment.email}
           </p>
+          {assignment.campaigns?.instructions && (
+            <Card className="mt-4 p-4 bg-primary/5">
+              <h3 className="font-semibold mb-2">Instructions:</h3>
+              <p className="text-sm whitespace-pre-wrap">{assignment.campaigns.instructions}</p>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-4 mb-8">
@@ -229,6 +261,34 @@ const Assignment = () => {
               
               <div className="bg-muted/50 rounded-lg p-4 mb-4">
                 <p className="whitespace-pre-wrap text-sm">{text.text.content}</p>
+              </div>
+              
+              {text.product.link && (
+                <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm">
+                    <LinkIcon className="h-4 w-4" />
+                    <a 
+                      href={text.product.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {text.product.link}
+                    </a>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2 mb-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload (Google Drive Link - Optional)
+                </label>
+                <Input
+                  placeholder="Paste Google Drive link here"
+                  value={uploadUrls[text.id] || ""}
+                  onChange={(e) => handleUploadUrlChange(text.id, e.target.value)}
+                />
               </div>
               
               <Button

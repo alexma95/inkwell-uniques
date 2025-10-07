@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +18,9 @@ const Admin = () => {
 
   // Form states
   const [newCampaignName, setNewCampaignName] = useState("");
+  const [campaignInstructions, setCampaignInstructions] = useState("");
   const [newProductName, setNewProductName] = useState("");
+  const [productLink, setProductLink] = useState("");
   const [newTexts, setNewTexts] = useState<string[]>(Array(25).fill(""));
 
   useEffect(() => {
@@ -73,7 +76,10 @@ const Admin = () => {
     try {
       const { data, error } = await supabase
         .from("campaigns")
-        .insert({ name: newCampaignName })
+        .insert({ 
+          name: newCampaignName,
+          instructions: campaignInstructions.trim() || null
+        })
         .select()
         .single();
 
@@ -82,6 +88,7 @@ const Admin = () => {
       setCampaigns([data, ...campaigns]);
       setSelectedCampaign(data.id);
       setNewCampaignName("");
+      setCampaignInstructions("");
       
       toast({
         title: "Success",
@@ -108,6 +115,7 @@ const Admin = () => {
           name: newProductName,
           campaign_id: selectedCampaign,
           position,
+          link: productLink.trim() || null,
         })
         .select()
         .single();
@@ -133,6 +141,7 @@ const Admin = () => {
 
       setProducts([...products, product]);
       setNewProductName("");
+      setProductLink("");
       setNewTexts(Array(25).fill(""));
       
       toast({
@@ -180,15 +189,21 @@ const Admin = () => {
           <TabsContent value="campaigns" className="space-y-4">
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Create Campaign</h2>
-              <div className="flex gap-2">
+              <div className="space-y-3">
                 <Input
                   placeholder="Campaign name"
                   value={newCampaignName}
                   onChange={(e) => setNewCampaignName(e.target.value)}
                 />
-                <Button onClick={createCampaign}>
+                <Textarea
+                  placeholder="Instructions for users (optional)"
+                  value={campaignInstructions}
+                  onChange={(e) => setCampaignInstructions(e.target.value)}
+                  rows={3}
+                />
+                <Button onClick={createCampaign} className="w-full">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create
+                  Create Campaign
                 </Button>
               </div>
             </Card>
@@ -227,6 +242,11 @@ const Admin = () => {
                       value={newProductName}
                       onChange={(e) => setNewProductName(e.target.value)}
                     />
+                    <Input
+                      placeholder="Product link (optional)"
+                      value={productLink}
+                      onChange={(e) => setProductLink(e.target.value)}
+                    />
                     
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Text Options (25 variants)</label>
@@ -261,6 +281,11 @@ const Admin = () => {
                         <div className="font-medium">
                           Position {product.position}: {product.name}
                         </div>
+                        {product.link && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Link: {product.link}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {products.length === 0 && (
